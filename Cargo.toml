@@ -1,0 +1,35 @@
+[package]
+name = "rapid"
+version = "0.1.0"
+authors = ["Marcin Sas-Szymanski <sasik520@gmail.com>"]
+description = "Rapid console application development"
+keywords = ["rapid", "console", "application", "development"]
+categories = ["command-line-interface"]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/synek317/rapid"
+documentation = "https://docs.rs/rapid"
+
+[badges]
+travis-ci = { repository = "synek317/rapid", branch = "master" }
+maintenance = { status = "actively-developed" }
+
+
+[dependencies]
+docopt         = "0.8.1"
+serde          = "1.0.20"
+serde_derive   = "1.0.20"
+time           = "0.1.38"
+log            = "0.3.8"
+slog           = "2.0.12"
+slog-stdlog    = "3.0.2"
+slog-scope     = "4.0.0"
+slog-term      = "2.3.0"
+slog-async     = "2.1.0"
+error-chain    = "0.11.0"
+derive_builder = "0.5.0"
+lazy_static    = "0.2.9"
+
+[dev-dependencies]
+regex            = "0.2.2"
+test-case-derive = "0.1.5"
