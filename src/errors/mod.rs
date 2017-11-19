@@ -1,34 +1,44 @@
-mod chained_error_methods;
+pub mod fail_methods;
+mod result_methods;
+mod option_methods;
 mod cumulative_error_collector;
 
-pub use self::chained_error_methods::ChainedErrorMethods;
+pub use self::fail_methods::*;
+pub use self::result_methods::*;
+pub use self::option_methods::*;
 pub use self::cumulative_error_collector::*;
 
-use std::fmt::Write;
+use std::result::Result as StdResult;
+use std::fmt;
 
-error_chain! {
-    errors {
-        CumulativeError(errors: Vec<Error>) {
-            cause("multiple errors occured")
-            display("{}", collect_errors(errors))
-        }
+pub type Result<T> = StdResult<T, ::failure::Error>;
+
+#[derive(Debug)]
+pub struct CumulativeError<T> {
+    errors: Vec<T>
+}
+
+impl<T> ::failure::Fail for CumulativeError<T> where T: fmt::Debug + fmt::Display + Send + Sync + 'static{}
+
+impl<T> CumulativeError<T> {
+    pub fn new(errors: Vec<T>) -> Self {
+        Self { errors }
     }
 }
 
-fn collect_errors(errors: &Vec<Error>) -> String {
-    let mut output = String::with_capacity(255);
+impl<T> fmt::Display for CumulativeError<T> where T: fmt::Display {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let _ = write!(f, "{} error(s) occured:", self.errors.len())?;
 
-    let _ = write!(output, "{} error(s) occured:", errors.len());
-
-    for (i, error) in errors.iter().enumerate() {
-        let _ = write!(output, "\nError no. {}: {}", i + 1, error);
-
-        for inner in error.iter().skip(1) {
-            let _ = write!(output, "\n  caused by: {}", inner);
+        for (i, error) in self.errors.iter().enumerate() {
+            let _ = write!(f, "\nError no. {}: {}", i + 1, error)?;
         }
+
+        Ok(())
     }
+}
 
-    writeln!(output);
-
-    output
+#[macro_export]
+macro_rules! bail {
+    ($($arg:tt)*) => { return Err(format_err!($($arg)*)); }
 }

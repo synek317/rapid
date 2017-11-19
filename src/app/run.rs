@@ -2,24 +2,25 @@ use std::env;
 use std::io::Write;
 use std::process::exit;
 use std::result::Result as StdResult;
-use error_chain::ChainedError;
 use serde::de::Deserialize;
 use logger::init_logging;
 use consts::{ERROR_EXIT_CODE, SUCCESS_EXIT_CODE};
 use utils::parse_cmd_args;
-use errors::ChainedErrorMethods;
+use errors::Result;
+use errors::fail_methods::*;
 use super::App;
 
-impl<TStdout: Write + Send + 'static, TStderr: Write + Send + 'static> App<TStdout, TStderr> {
-    pub fn run<F, TError>(self, app: F) -> i32
-        where F: FnOnce() -> StdResult<(), TError>,
-              TError: ChainedError
-    {
-        let exit_code = {
-            let name = self.name;
-            let _guard = init_logging(self.stdout);
+// macros, run/run_failable and run_with_args/run_failable_with_args are only ugly workaround
+// for failure::Error not implementing failure::Fail.
+// when specialization lands and this issue is resolved, macros and run_failable* methods should be deleted
 
-            log_process!("running {} with command line: {}", name, get_cmd_args() => { app() })
+macro_rules! run {
+    ($self:ident, $app:ident) => {{
+        let exit_code = {
+            let name = $self.name;
+            let _guard = init_logging($self.stdout);
+
+            log_process!("running {} with command line: {}", name, get_cmd_args() => { $app() })
                 .map(|_| SUCCESS_EXIT_CODE)
                 .unwrap_or_else(|e| {
                     error!("One or more errors occurred while running {}:", name);
@@ -28,35 +29,62 @@ impl<TStdout: Write + Send + 'static, TStderr: Write + Send + 'static> App<TStdo
                 })
         };
 
-        if self.exit {
+        if $self.exit {
             exit(exit_code)
         }
 
         exit_code
-    }
+    }}
+}
 
-    pub fn run_with_args<'a, F, TCmdArgs, TError>(mut self, app: F) -> i32
-        where F: FnOnce(TCmdArgs) -> StdResult<(), TError>,
-              TCmdArgs: Deserialize<'a>,
-              TError: ChainedError
-    {
+macro_rules! run_with_args {
+    ($self:ident, $app:ident, $run:ident) => {{
         use utils::ParsingResult::*;
 
-        match parse_cmd_args(&self.usage) {
-            Args(args) => self.run(|| app(args)),
+        match parse_cmd_args(&$self.usage) {
+            Args(args) => $self.$run(|| $app(args)),
             Version => {
-                let _ = writeln!(self.stdout, "{} v.{}", self.name, self.version);
-                exit_if_requested(self.exit, SUCCESS_EXIT_CODE)
+                let _ = writeln!($self.stdout, "{} v.{}", $self.name, $self.version);
+                exit_if_requested($self.exit, SUCCESS_EXIT_CODE)
             },
             Help => {
-                let _ = writeln!(self.stdout, "{}", self.usage);
-                exit_if_requested(self.exit, SUCCESS_EXIT_CODE)
+                let _ = writeln!($self.stdout, "{}", $self.usage);
+                exit_if_requested($self.exit, SUCCESS_EXIT_CODE)
             },
             Error(e) => {
-                let _ = writeln!(self.stderr, "{}", e);
-                exit_if_requested(self.exit, ERROR_EXIT_CODE)
+                let _ = writeln!($self.stderr, "{}", e);
+                exit_if_requested($self.exit, ERROR_EXIT_CODE)
             }
         }
+    }}
+}
+impl<TStdout: Write + Send + 'static, TStderr: Write + Send + 'static> App<TStdout, TStderr> {
+    pub fn run_failable<F, TError>(self, app: F) -> i32
+        where F: FnOnce() -> StdResult<(), TError>,
+              TError: FailMethods
+    {
+        run!(self, app)
+    }
+
+    pub fn run<F>(self, app: F) -> i32
+        where F: FnOnce() -> Result<()>,
+    {
+        run!(self, app)
+    }
+
+    pub fn run_failable_with_args<'a, F, TCmdArgs, TError>(mut self, app: F) -> i32
+        where F: FnOnce(TCmdArgs) -> StdResult<(), TError>,
+              TCmdArgs: Deserialize<'a>,
+              TError: FailMethods
+    {
+        run_with_args!(self, app, run_failable)
+    }
+
+    pub fn run_with_args<'a, F, TCmdArgs>(mut self, app: F) -> i32
+        where F: FnOnce(TCmdArgs) -> Result<()>,
+              TCmdArgs: Deserialize<'a>
+    {
+        run_with_args!(self, app, run)
     }
 }
 
@@ -79,16 +107,14 @@ mod tests {
 
     mod run {
         use super::*;
-        use super::super::super::super::errors::*;
 
         #[test]
         fn runs_given_function() {
-//            let _g = super::super::super::super::test_utils::LOCK.lock().unwrap();
 
             let mut executed = false;
 
-            super::super::super::super::test_utils::OutputStream::capture(|stdout| {
-                super::super::super::super::test_utils::OutputStream::capture(|stderr| {
+            OutputStream::capture(|stdout| {
+                OutputStream::capture(|stderr| {
                     App::new(stdout, stderr)
                         .run(|| -> Result<()> {
                             executed = true;

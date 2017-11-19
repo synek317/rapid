@@ -48,7 +48,7 @@ macro_rules! log_process {
 #[macro_export]
 macro_rules! run_and_measure {
     ($block:block) => {{
-        use time;
+        use $crate::time;
 
         let start = time::precise_time_ns();
         let result = (|| $block)();
@@ -66,7 +66,7 @@ mod tests {
     #[test]
     fn work_in_progress() {
         //check no panic
-        let output = OutputStream::capture(|output_stream| {
+        let _output = OutputStream::capture(|output_stream| {
             let _guard = init_logging(output_stream);
             info!("x");
         });
