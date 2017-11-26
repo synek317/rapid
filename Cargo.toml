@@ -1,6 +1,6 @@
 [package]
 name = "rapid"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Marcin Sas-Szymanski <sasik520@gmail.com>"]
 description = "Rapid console application development"
 keywords = ["rapid", "console", "application", "development"]
